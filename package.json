@@ -10,6 +10,6 @@
   },
   "config": {
     "signtool": "// absolute path to signtool.exe, you can use / instead of \\ here",
-    "subject": "// certificate subject name, usually your company name"
+    "thumbprint": "// certificate thumbprint (40 hex chars), shown by `gci -Recurse Cert: -CodeSigningCert`"
   }
 }

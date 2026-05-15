@@ -13,7 +13,7 @@ interface RawCertInfo {
   Thumbprint: string;
 }
 
-export default async function findCertificate(subject?: string): Promise<Certificate[]> {
+export default async function findCertificate(thumbprint?: string): Promise<Certificate[]> {
   // stolen from npm:app-builder-lib/src/codeSign/windowsCodeSign.ts
   const raw = await exec("powershell.exe", [
     "-NoProfile",
@@ -34,10 +34,15 @@ export default async function findCertificate(subject?: string): Promise<Certifi
       isLocalMachine,
     });
   }
-  if (subject && !subject.startsWith("//")) {
-    result = result.filter((e) => e.subject.includes(subject));
+  if (thumbprint && !thumbprint.startsWith("//")) {
+    const want = normalize(thumbprint);
+    result = result.filter((e) => normalize(e.thumbprint) === want);
   }
   return result;
+}
+
+function normalize(thumbprint: string): string {
+  return thumbprint.replace(/\s+/g, "").toLowerCase();
 }
 
 function toArray<T>(a: T | T[] | null | undefined): T[] {

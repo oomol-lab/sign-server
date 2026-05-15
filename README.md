@@ -78,7 +78,7 @@ If `bun start` reports an error, see the table below.
 | `Invalid .token file` | Ensure each entry in `.token` follows the `username:password` format. |
 | `Not found SignTool.exe` | Set `config.signtool` in `package.json` to the absolute path of `SignTool.exe`. |
 | `Not found certificate` | Re-check [Section 1](#1-prepare-the-windows-machine) and confirm the UKey is connected. |
-| `Found multiple certificates` | Set `config.subject` in `package.json` to disambiguate by certificate subject. |
+| `Found multiple certificates` | Set `config.thumbprint` in `package.json` to the 40-char thumbprint of the certificate to use. Run `gci -Recurse Cert: -CodeSigningCert \| Select Subject,Thumbprint` to list candidates. |
 
 ### Web UI
 

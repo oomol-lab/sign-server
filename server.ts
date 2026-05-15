@@ -49,7 +49,7 @@ const indexPath = path.join(import.meta.dir, "index.html");
 
 const { config } = await Bun.file(packagePath).json();
 const signtool = await findSignTool(config.signtool);
-const certificates = await findCertificate(config.subject).catch(() => []);
+const certificates = await findCertificate(config.thumbprint).catch(() => []);
 
 if (!signtool) {
   console.error("Not found SignTool.exe");

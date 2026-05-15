@@ -78,7 +78,7 @@ bun start
 | `Invalid .token file` | 检查 `.token` 内容，每行须为 `username:password` 格式。 |
 | `Not found SignTool.exe` | 在 `package.json` 的 `config.signtool` 字段填入 `SignTool.exe` 的绝对路径。 |
 | `Not found certificate` | 重新检查 [第 1 节](#1-准备-windows-机器) 的步骤，并确认 UKey 已连接。 |
-| `Found multiple certificates` | 在 `package.json` 的 `config.subject` 字段中指定要使用的证书主题。 |
+| `Found multiple certificates` | 在 `package.json` 的 `config.thumbprint` 字段中填入要使用的证书指纹（40 位十六进制字符）。可执行 `gci -Recurse Cert: -CodeSigningCert \| Select Subject,Thumbprint` 列出候选。 |
 
 ### Web UI
 
