@@ -42,6 +42,13 @@ import findSignTool from "./lib/find-signtool.ts";
 import findCertificate from "./lib/find-certificate.ts";
 import makeSignFn, { type SignBody, type HashMethod } from "./lib/make-sign-fn.ts";
 import { cache } from "./lib/utils.ts";
+import {
+  chunks_clear,
+  chunk_status,
+  chunk_save,
+  chunk_finalize,
+  chunk_abort,
+} from "./lib/chunks.ts";
 import { check_auth, unauthorized } from "./lib/auth.ts";
 import { load_config } from "./lib/config.ts";
 
@@ -74,8 +81,13 @@ const certificate = certificates[0];
 const sign = makeSignFn(signtool, certificate);
 
 cache.clear();
+chunks_clear();
 
 const CORS = { "Access-Control-Allow-Origin": "*" };
+
+function is_valid_hash(s: string | null): s is string {
+  return typeof s === "string" && /^[a-f0-9]{32}$/i.test(s);
+}
 
 const server = Bun.serve({
   hostname: "0.0.0.0",
@@ -97,6 +109,66 @@ const server = Bun.serve({
     if (req.method === "POST" && url.pathname === "/exists") {
       const hash = await req.text();
       return Response.json(cache.has(hash), { headers: CORS });
+    }
+
+    // POST /chunk/status "hash" => (json) { received: number[], total, name }
+    if (req.method === "POST" && url.pathname === "/chunk/status") {
+      const hash = await req.text();
+      if (!is_valid_hash(hash)) {
+        return new Response("invalid hash", { status: 400, headers: CORS });
+      }
+      return Response.json(chunk_status(hash), { headers: CORS });
+    }
+
+    // POST /chunk?hash=&index=&total=&name= (body = chunk bytes)
+    //   => (json) { received: number[] }
+    if (req.method === "POST" && url.pathname === "/chunk") {
+      const hash = url.searchParams.get("hash");
+      const index_str = url.searchParams.get("index");
+      const total_str = url.searchParams.get("total");
+      const name = url.searchParams.get("name");
+      if (!is_valid_hash(hash) || !index_str || !total_str || !name) {
+        return new Response("missing required query params", { status: 400, headers: CORS });
+      }
+      const index = Number(index_str);
+      const total = Number(total_str);
+      if (
+        !Number.isInteger(index) || !Number.isInteger(total) ||
+        total <= 0 || index < 0 || index >= total
+      ) {
+        return new Response("invalid index/total", { status: 400, headers: CORS });
+      }
+      try {
+        const data = new Uint8Array(await req.arrayBuffer());
+        const received = await chunk_save(hash, index, total, name, data);
+        return Response.json({ received }, { headers: CORS });
+      } catch (error) {
+        return new Response((error as Error).message, { status: 500, headers: CORS });
+      }
+    }
+
+    // POST /chunk/finalize "hash" => (json) { ok: true }
+    if (req.method === "POST" && url.pathname === "/chunk/finalize") {
+      const hash = await req.text();
+      if (!is_valid_hash(hash)) {
+        return new Response("invalid hash", { status: 400, headers: CORS });
+      }
+      try {
+        await chunk_finalize(hash);
+        return Response.json({ ok: true }, { headers: CORS });
+      } catch (error) {
+        return new Response((error as Error).message, { status: 400, headers: CORS });
+      }
+    }
+
+    // POST /chunk/abort "hash" => (json) { ok: true }
+    if (req.method === "POST" && url.pathname === "/chunk/abort") {
+      const hash = await req.text();
+      if (!is_valid_hash(hash)) {
+        return new Response("invalid hash", { status: 400, headers: CORS });
+      }
+      chunk_abort(hash);
+      return Response.json({ ok: true }, { headers: CORS });
     }
 
     // POST /sign FormData { file, hash, isNest } => (octet-stream) signed file

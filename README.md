@@ -11,6 +11,7 @@ An HTTP wrapper around Microsoft [SignTool.exe](https://learn.microsoft.com/en-u
 
 - HTTP API for signing files with a hardware UKey on a remote Windows host
 - Content-addressed cache to skip re-uploading unchanged binaries
+- Chunked upload for large files — bypass gateway size limits and retry failed chunks
 - HTTP Basic Auth with multi-account support
 - Built-in Web UI for manual signing and connectivity testing
 - Drop-in [`sign.js`](./sign.example.js) for Electron Builder
@@ -148,6 +149,47 @@ Sign a file and return the signed bytes.
   - `hash` — `"sha1"` or `"sha256"`
   - `isNest` — `"1"` for nested signatures, `""` otherwise
 - **Response** — `application/octet-stream`: the signed file
+
+### Chunked Upload
+
+For **large files**: split the payload into smaller pieces, upload them independently to bypass gateway request-size limits, and retry per-chunk on failure. Once all chunks are uploaded, call `/sign` with the file hash — no re-upload needed.
+
+Pending chunks are cleared when the server restarts; resumable upload only works within a single server lifetime.
+
+`sign.example.js` enables chunked upload automatically for files larger than 16 MiB, with 4 MiB chunks. Override via the `SIGN_SERVER_CHUNK_THRESHOLD` / `SIGN_SERVER_CHUNK_SIZE` environment variables.
+
+#### `POST /chunk/status`
+
+Query which chunks have been received for the given file hash, for resuming an interrupted upload.
+
+- **Body** — raw text: the final file's MD5 hash
+- **Response** — JSON `{ "received": number[], "total": number | null, "name": string | null }`
+
+#### `POST /chunk`
+
+Upload a single chunk.
+
+- **Query parameters**:
+  - `hash` — final file's MD5 hash
+  - `index` — zero-based chunk index
+  - `total` — total number of chunks
+  - `name` — original file name (URL-encoded)
+- **Body** — `application/octet-stream`: the chunk bytes
+- **Response** — JSON `{ "received": number[] }`
+
+#### `POST /chunk/finalize`
+
+Assemble all uploaded chunks into the final file and verify its MD5 matches the supplied hash. On success the file is added to the cache; subsequent calls to `/sign` can reference it by hash.
+
+- **Body** — raw text: the final file's MD5 hash
+- **Response** — `200 { "ok": true }`; `400` with an error message if any chunk is missing or the hash does not match
+
+#### `POST /chunk/abort`
+
+Discard the in-progress chunked upload and delete any chunks already received.
+
+- **Body** — raw text: the final file's MD5 hash
+- **Response** — JSON `{ "ok": true }`
 
 ## SignTool.exe Cheatsheet
 

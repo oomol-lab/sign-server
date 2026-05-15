@@ -11,6 +11,7 @@
 
 - 通过 HTTP API 远程调用 Windows 主机上的 UKey 进行代码签名
 - 基于内容哈希的缓存机制，避免重复上传相同文件
+- 大文件支持分段上传，规避网关请求大小限制并支持失败重试
 - 支持多账号的 HTTP Basic Auth
 - 内置 Web UI，可手动签名、验证连通性
 - 提供开箱即用的 [`sign.js`](./sign.example.js) 示例，直接对接 Electron Builder
@@ -148,6 +149,47 @@ SIGN_SERVER_PASS=secret \
   - `hash` — `"sha1"` 或 `"sha256"`
   - `isNest` — 嵌套签名传 `"1"`，否则传 `""`
 - **响应** — `application/octet-stream`：签名后的文件
+
+### 分段上传
+
+适合**大文件**的场景：把文件切成多个小块分别上传，规避网关请求大小限制；中途失败可按分段重试或断点续传。上传完成后再以哈希调用 `/sign` 即可（无需重传）。
+
+服务进程重启时会清空所有未完成的分段，断点续传仅在同一进程生命周期内有效。
+
+`sign.example.js` 默认对大于 16 MiB 的文件启用分段上传，块大小 4 MiB，可通过 `SIGN_SERVER_CHUNK_THRESHOLD` / `SIGN_SERVER_CHUNK_SIZE` 环境变量调整。
+
+#### `POST /chunk/status`
+
+查询某哈希文件已上传的分段，用于断点续传。
+
+- **请求体** — 纯文本：最终文件的 MD5 哈希
+- **响应** — JSON `{ "received": number[], "total": number | null, "name": string | null }`
+
+#### `POST /chunk`
+
+上传单个分段。
+
+- **Query 参数**：
+  - `hash` — 最终文件的 MD5 哈希
+  - `index` — 分段下标（从 0 开始）
+  - `total` — 分段总数
+  - `name` — 原始文件名（需 URL 编码）
+- **请求体** — `application/octet-stream`：当前分段的原始字节
+- **响应** — JSON `{ "received": number[] }`
+
+#### `POST /chunk/finalize`
+
+合并所有分段为完整文件，并校验 MD5 与传入哈希一致。校验通过后写入缓存，后续 `/sign` 可直接传哈希。
+
+- **请求体** — 纯文本：最终文件的 MD5 哈希
+- **响应** — `200 { "ok": true }`；分段缺失或哈希不匹配时返回 `400` 与错误信息
+
+#### `POST /chunk/abort`
+
+放弃当前未完成的分段上传，删除已上传的分段。
+
+- **请求体** — 纯文本：最终文件的 MD5 哈希
+- **响应** — JSON `{ "ok": true }`
 
 ## SignTool.exe 速查表
 
