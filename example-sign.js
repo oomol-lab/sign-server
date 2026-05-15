@@ -2,6 +2,14 @@ const fs = require("fs");
 const { basename } = require("path");
 const crypto = require("crypto");
 
+// HTTP Basic Auth credentials. Read from env to avoid committing secrets.
+//   SIGN_SERVER_USER=admin SIGN_SERVER_PASS=secret electron-builder ...
+const SIGN_SERVER_USER = process.env.SIGN_SERVER_USER || "";
+const SIGN_SERVER_PASS = process.env.SIGN_SERVER_PASS || "";
+const authHeader =
+  "Basic " +
+  Buffer.from(`${SIGN_SERVER_USER}:${SIGN_SERVER_PASS}`).toString("base64");
+
 /** @type {import('app-builder-lib').CustomWindowsSign} */
 module.exports = async function sign({ path, hash, isNest }) {
   let resp;
@@ -9,6 +17,7 @@ module.exports = async function sign({ path, hash, isNest }) {
   const fileHash = await computeHash(path);
   resp = await fetch("http://{local-ip}:3000/exists", {
     method: "POST",
+    headers: { Authorization: authHeader },
     body: fileHash,
   });
   if (!resp.ok) {
@@ -27,6 +36,7 @@ module.exports = async function sign({ path, hash, isNest }) {
 
   resp = await fetch("http://{local-ip}:3000/sign", {
     method: "POST",
+    headers: { Authorization: authHeader },
     body,
   });
 

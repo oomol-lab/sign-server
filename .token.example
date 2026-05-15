@@ -1,0 +1,7 @@
+# .token file: HTTP Basic Auth credentials.
+# Copy this file to ".token" (gitignored) and replace the credentials below.
+# Each non-empty, non-comment line is one "username:password" pair;
+# all listed accounts are accepted.
+admin:change-me
+# alice:another-password
+# bob:yet-another

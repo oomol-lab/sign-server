@@ -37,18 +37,17 @@
 //
 
 import os from "os";
-import fs from "fs";
-import http from "http";
-import parseFormData from "./lib/parse-formdata.js";
+import path from "path";
 import findSignTool from "./lib/find-signtool.js";
 import findCertificate from "./lib/find-certificate.js";
 import makeSignFn from "./lib/make-sign-fn.js";
-import { cache, text, send } from "./lib/utils.js";
+import { cache } from "./lib/utils.js";
+import { check_auth, unauthorized } from "./lib/auth.js";
 
-const packageJSON = new URL("package.json", import.meta.url);
-const indexHTML = new URL("index.html", import.meta.url);
+const packagePath = path.join(import.meta.dir, "package.json");
+const indexPath = path.join(import.meta.dir, "index.html");
 
-const { config } = JSON.parse(fs.readFileSync(packageJSON, "utf8"));
+const { config } = await Bun.file(packagePath).json();
 const signtool = await findSignTool(config.signtool);
 const certificates = await findCertificate(config.subject).catch(() => []);
 
@@ -72,53 +71,87 @@ if (!signtool || certificates.length !== 1) {
 }
 
 const certificate = certificates[0];
-
-const index_html = (res) => {
-  res.writeHead(200, { "Content-Type": "text/html" });
-  fs.createReadStream(indexHTML).pipe(res, { end: true });
-};
-
 const sign = makeSignFn(signtool, certificate);
 
-const server = http.createServer(async (req, res) => {
-  res.setHeader("Access-Control-Allow-Origin", "*");
-
-  if (req.method === "GET" && req.url === "/") {
-    return index_html(res);
-  }
-
-  // POST /exists "hash of file" => (json) true | false
-  if (req.method === "POST" && req.url === "/exists") {
-    return send(res, 200, cache.has(await text(req)));
-  }
-
-  // POST /sign FormData { file, hash, isNest } => (octet-stream) signed file
-  //            file   = "hash of exist file" or (new file) { name, buffer }
-  //            hash   = "sha1" or "sha256"
-  //            isNest = "" or "1"
-  if (req.method === "POST" && req.url === "/sign") {
-    const body = await parseFormData(req);
-    if (body) {
-      return sign(body, res).catch((error) => {
-        send(res, 400, error.message);
-      });
-    } else {
-      return send(res, 400, "expected form data");
-    }
-  }
-
-  res.statusCode = 404;
-  res.end();
-});
-
 cache.clear();
-server.listen({ host: "0.0.0.0", port: 3000 }, () => {
-  // stolen from npm:local-access
-  let k, tmp;
-  let nets = os.networkInterfaces();
-  for (k in nets) {
-    if ((tmp = nets[k].find((x) => x.family === "IPv4" && !x.internal))) {
-      console.log(`serving http://${tmp.address}:3000`);
+
+const CORS = { "Access-Control-Allow-Origin": "*" };
+
+const server = Bun.serve({
+  hostname: "0.0.0.0",
+  port: 3000,
+  async fetch(req) {
+    const url = new URL(req.url);
+
+    if (!check_auth(req)) {
+      return unauthorized(CORS);
     }
-  }
+
+    if (req.method === "GET" && url.pathname === "/") {
+      return new Response(Bun.file(indexPath), {
+        headers: { ...CORS, "Content-Type": "text/html" },
+      });
+    }
+
+    // POST /exists "hash of file" => (json) true | false
+    if (req.method === "POST" && url.pathname === "/exists") {
+      const hash = await req.text();
+      return Response.json(cache.has(hash), { headers: CORS });
+    }
+
+    // POST /sign FormData { file, hash, isNest } => (octet-stream) signed file
+    //            file   = "hash of exist file" or (new file) { name, buffer }
+    //            hash   = "sha1" or "sha256"
+    //            isNest = "" or "1"
+    if (req.method === "POST" && url.pathname === "/sign") {
+      let body;
+      try {
+        body = await parseSignBody(req);
+      } catch {
+        return new Response("expected form data", { status: 400, headers: CORS });
+      }
+      if (!body) {
+        return new Response("expected form data", { status: 400, headers: CORS });
+      }
+      try {
+        return await sign(body, CORS);
+      } catch (error) {
+        return new Response(error.message, { status: 400, headers: CORS });
+      }
+    }
+
+    return new Response(null, { status: 404, headers: CORS });
+  },
+  error(error) {
+    return new Response(error.message, { status: 500, headers: CORS });
+  },
 });
+
+async function parseSignBody(req) {
+  const fd = await req.formData();
+  const fileField = fd.get("file");
+  if (fileField == null) return null;
+
+  let file;
+  if (typeof fileField === "string") {
+    file = fileField;
+  } else {
+    const buffer = new Uint8Array(await fileField.arrayBuffer());
+    file = { name: fileField.name, buffer };
+  }
+
+  return {
+    file,
+    hash: fd.get("hash"),
+    isNest: fd.get("isNest"),
+  };
+}
+
+// stolen from npm:local-access
+const nets = os.networkInterfaces();
+for (const k in nets) {
+  const tmp = nets[k].find((x) => x.family === "IPv4" && !x.internal);
+  if (tmp) {
+    console.log(`serving http://${tmp.address}:${server.port}`);
+  }
+}
