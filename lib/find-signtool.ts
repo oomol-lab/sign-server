@@ -2,10 +2,10 @@ import fs from "fs";
 import { join } from "path";
 
 const known_bases = ["C:\\Program Files (x86)", "C:", "D:"];
-const folders = ["Windows Kits", "10", "bin", /^[.\d]+$/, "x64"];
+const folders: (string | RegExp)[] = ["Windows Kits", "10", "bin", /^[.\d]+$/, "x64"];
 const binary = "signtool.exe";
 
-export default function findSignTool(path_from_config) {
+export default function findSignTool(path_from_config?: string): string | undefined {
   if (path_from_config && fs.existsSync(path_from_config)) {
     return path_from_config;
   }
@@ -18,14 +18,18 @@ export default function findSignTool(path_from_config) {
   }
 }
 
-function dig(base, folders, binary) {
+function dig(
+  base: string,
+  folders: (string | RegExp)[],
+  binary: string
+): string | undefined {
   let path = base;
 
   for (const folder of folders) {
     if (typeof folder === "string") {
       path = join(path, folder);
       if (!fs.existsSync(path)) return;
-    } else if (typeof folder.test === "function") {
+    } else if (folder instanceof RegExp) {
       let next = fs.readdirSync(path).find((item) => folder.test(item));
       if (!next) return;
       path = join(path, next);
@@ -40,7 +44,7 @@ function dig(base, folders, binary) {
   return path;
 }
 
-function unexpected(value) {
+function unexpected(value: unknown): Error {
   return new Error(
     "expected string or regexp, got " + Object.prototype.toString.call(value)
   );

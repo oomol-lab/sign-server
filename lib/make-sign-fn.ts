@@ -1,25 +1,38 @@
 import os from "os";
 import fs from "fs";
 import path from "path";
-import { exec, cache, md5 } from "./utils.js";
+import { exec, cache, md5 } from "./utils.ts";
+import type { Certificate } from "./find-certificate.ts";
+import type { Meta, CacheFileObject } from "./cache.ts";
+
+export type HashMethod = "sha1" | "sha256";
+
+export interface SignBody {
+  file: string | CacheFileObject;
+  hash: HashMethod;
+  isNest?: string | null;
+}
 
 export default function makeSignFn(
-  signtool,
-  { thumbprint, subject, store, isLocalMachine }
+  signtool: string,
+  { thumbprint, subject, store, isLocalMachine }: Certificate
 ) {
-  function by_value(record, value) {
+  function by_value(
+    record: Record<string, string>,
+    value: string
+  ): string | undefined {
     for (const key in record) {
       if (record[key] === value) return key;
     }
   }
 
-  function edit_meta(fn) {
+  function edit_meta(fn: (meta: Meta) => void): void {
     const meta = cache.meta();
     fn(meta);
     cache.meta(meta);
   }
 
-  function is_signed(file_hash, method) {
+  function is_signed(file_hash: string, method: HashMethod): boolean {
     const meta = cache.meta();
     const key1 = by_value(meta.sha1, file_hash);
     if (key1) {
@@ -55,9 +68,13 @@ export default function makeSignFn(
   //                       save new_file to temp, save meta
   //                       return new_file
   //
-  return async function sign({ file, hash, isNest }, baseHeaders = {}) {
-    let meta;
-    let file_hash;
+  return async function sign(
+    { file, hash, isNest }: SignBody,
+    baseHeaders: Record<string, string> = {}
+  ): Promise<Response> {
+    let meta: Meta;
+    let file_hash: string;
+    let file_obj: CacheFileObject;
 
     // is hash of file
     if (typeof file === "string") {
@@ -68,10 +85,9 @@ export default function makeSignFn(
       const name = cache.name(file_hash);
       console.log("Signing (cached)", file_hash, name);
 
-      file = {
-        name,
-        buffer: await cache.get(file_hash),
-      };
+      const buffer = await cache.get(file_hash);
+      if (!buffer) throw not_found_error(file_hash);
+      file_obj = { name, buffer };
     }
 
     // is Blob { name, buffer }
@@ -87,6 +103,7 @@ export default function makeSignFn(
         });
         await cache.set(file_hash, file);
       }
+      file_obj = file;
     }
 
     // error?
@@ -107,7 +124,7 @@ export default function makeSignFn(
     // is signed? as dest
     if (is_signed(file_hash, hash)) {
       console.log("Already signed", file_hash);
-      return new Response(file.buffer, {
+      return new Response(file_obj.buffer, {
         headers: { ...baseHeaders, "Content-Type": "application/octet-stream" },
       });
     }
@@ -116,8 +133,8 @@ export default function makeSignFn(
     const dummy = Math.random().toString(36).slice(2);
     const tmpdir = path.join(os.tmpdir(), dummy);
     fs.mkdirSync(tmpdir, { recursive: true });
-    const tmpfile = path.join(tmpdir, file.name);
-    await Bun.write(tmpfile, file.buffer);
+    const tmpfile = path.join(tmpdir, file_obj.name);
+    await Bun.write(tmpfile, file_obj.buffer);
 
     // signtool {...options} $TEMP/file
     // -----------------------------------
@@ -136,7 +153,7 @@ export default function makeSignFn(
         // the file is being used by another process (maybe windows defender)
         // wait 15s and try again.
         if (i === 0) {
-          console.error(error.message);
+          console.error((error as Error).message);
           console.log("Trying again", file_hash);
           await new Promise((resolve) => setTimeout(resolve, 15 * 1000));
         } else {
@@ -162,6 +179,6 @@ export default function makeSignFn(
   };
 }
 
-function not_found_error(file_hash) {
+function not_found_error(file_hash: string): Error {
   return new Error("not found file with hash " + file_hash);
 }

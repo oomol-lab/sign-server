@@ -23,9 +23,21 @@ export const cache_dir = path.join(import.meta.dir, "../node_modules/.sign-temp"
 //   Meta.temp[hash(file)] = hash(new_file)
 //
 
+export interface Meta {
+  keep: Record<string, string>;
+  temp: Record<string, string>;
+  sha1: Record<string, string>;
+  sha256: Record<string, string>;
+}
+
+export interface CacheFileObject {
+  name: string;
+  buffer: Uint8Array;
+}
+
 fs.mkdirSync(cache_dir, { recursive: true });
 
-export function cache_clear() {
+export function cache_clear(): void {
   const meta = cache_meta();
   for (const hash in meta.temp) {
     const dir = path.join(cache_dir, hash);
@@ -46,12 +58,12 @@ export function cache_clear() {
   cache_meta(meta);
 }
 
-export function cache_has(hash) {
+export function cache_has(hash: string): boolean {
   const dir = path.join(cache_dir, hash);
   return fs.existsSync(dir) && fs.readdirSync(dir).length === 1;
 }
 
-export async function cache_get(hash) {
+export async function cache_get(hash: string): Promise<Uint8Array | undefined> {
   const dir = path.join(cache_dir, hash);
   try {
     const file = fs.readdirSync(dir)[0];
@@ -61,7 +73,10 @@ export async function cache_get(hash) {
   } catch {}
 }
 
-export async function cache_set(hash, obj) {
+export async function cache_set(
+  hash: string,
+  obj: string | CacheFileObject
+): Promise<string> {
   const dir = path.join(cache_dir, hash);
   fs.mkdirSync(dir, { recursive: true });
   if (typeof obj === "string") {
@@ -83,7 +98,7 @@ export async function cache_set(hash, obj) {
   }
 }
 
-export function cache_meta(to_save) {
+export function cache_meta(to_save?: Meta): Meta {
   const file = path.join(cache_dir, "meta.json");
   if (to_save) {
     fs.writeFileSync(file, JSON.stringify(to_save, null, 2));
@@ -96,12 +111,12 @@ export function cache_meta(to_save) {
   }
 }
 
-export function cache_name(hash) {
+export function cache_name(hash: string): string {
   const dir = path.join(cache_dir, hash);
   return fs.readdirSync(dir)[0];
 }
 
-export function cache_path(hash, name) {
+export function cache_path(hash: string, name: string): string {
   return path.join(cache_dir, hash, name);
 }
 

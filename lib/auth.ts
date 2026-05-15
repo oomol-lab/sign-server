@@ -4,8 +4,8 @@ import { timingSafeEqual } from "crypto";
 
 const token_file = path.join(import.meta.dir, "..", ".token");
 
-function load_credentials() {
-  let content;
+function load_credentials(): string[] {
+  let content: string;
   try {
     content = fs.readFileSync(token_file, "utf8");
   } catch {
@@ -33,7 +33,7 @@ const expected_bufs = credentials_list.map((cred) =>
   Buffer.from("Basic " + Buffer.from(cred).toString("base64"))
 );
 
-export function check_auth(req) {
+export function check_auth(req: Request): boolean {
   const header = req.headers.get("authorization");
   if (!header) return false;
   const got = Buffer.from(header);
@@ -45,7 +45,7 @@ export function check_auth(req) {
   return false;
 }
 
-export function unauthorized(extra_headers = {}) {
+export function unauthorized(extra_headers: Record<string, string> = {}): Response {
   return new Response("Unauthorized", {
     status: 401,
     headers: {

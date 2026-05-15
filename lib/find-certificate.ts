@@ -1,6 +1,19 @@
-import { exec } from "./utils.js";
+import { exec } from "./utils.ts";
 
-export default async function findCertificate(subject) {
+export interface Certificate {
+  thumbprint: string;
+  subject: string;
+  store: string;
+  isLocalMachine: boolean;
+}
+
+interface RawCertInfo {
+  Subject: string;
+  PSParentPath: string;
+  Thumbprint: string;
+}
+
+export default async function findCertificate(subject?: string): Promise<Certificate[]> {
   // stolen from npm:app-builder-lib/src/codeSign/windowsCodeSign.ts
   const raw = await exec("powershell.exe", [
     "-NoProfile",
@@ -8,8 +21,8 @@ export default async function findCertificate(subject) {
     "-Command",
     "Get-ChildItem -Recurse Cert: -CodeSigningCert | Select-Object -Property Subject,PSParentPath,Thumbprint | ConvertTo-Json -Compress",
   ]);
-  const certList = raw.length === 0 ? [] : toArray(JSON.parse(raw));
-  let result = [];
+  const certList: RawCertInfo[] = raw.length === 0 ? [] : toArray(JSON.parse(raw));
+  let result: Certificate[] = [];
   for (const certInfo of certList) {
     const parentPath = certInfo.PSParentPath;
     const store = parentPath.slice(parentPath.lastIndexOf("\\") + 1);
@@ -27,6 +40,6 @@ export default async function findCertificate(subject) {
   return result;
 }
 
-function toArray(a) {
+function toArray<T>(a: T | T[] | null | undefined): T[] {
   return a == null ? [] : Array.isArray(a) ? a : [a];
 }

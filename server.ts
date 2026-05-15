@@ -38,11 +38,11 @@
 
 import os from "os";
 import path from "path";
-import findSignTool from "./lib/find-signtool.js";
-import findCertificate from "./lib/find-certificate.js";
-import makeSignFn from "./lib/make-sign-fn.js";
-import { cache } from "./lib/utils.js";
-import { check_auth, unauthorized } from "./lib/auth.js";
+import findSignTool from "./lib/find-signtool.ts";
+import findCertificate from "./lib/find-certificate.ts";
+import makeSignFn, { type SignBody, type HashMethod } from "./lib/make-sign-fn.ts";
+import { cache } from "./lib/utils.ts";
+import { check_auth, unauthorized } from "./lib/auth.ts";
 
 const packagePath = path.join(import.meta.dir, "package.json");
 const indexPath = path.join(import.meta.dir, "index.html");
@@ -104,7 +104,7 @@ const server = Bun.serve({
     //            hash   = "sha1" or "sha256"
     //            isNest = "" or "1"
     if (req.method === "POST" && url.pathname === "/sign") {
-      let body;
+      let body: SignBody | null;
       try {
         body = await parseSignBody(req);
       } catch {
@@ -116,7 +116,7 @@ const server = Bun.serve({
       try {
         return await sign(body, CORS);
       } catch (error) {
-        return new Response(error.message, { status: 400, headers: CORS });
+        return new Response((error as Error).message, { status: 400, headers: CORS });
       }
     }
 
@@ -127,12 +127,12 @@ const server = Bun.serve({
   },
 });
 
-async function parseSignBody(req) {
+async function parseSignBody(req: Request): Promise<SignBody | null> {
   const fd = await req.formData();
   const fileField = fd.get("file");
   if (fileField == null) return null;
 
-  let file;
+  let file: SignBody["file"];
   if (typeof fileField === "string") {
     file = fileField;
   } else {
@@ -142,15 +142,15 @@ async function parseSignBody(req) {
 
   return {
     file,
-    hash: fd.get("hash"),
-    isNest: fd.get("isNest"),
+    hash: fd.get("hash") as HashMethod,
+    isNest: fd.get("isNest") as string | null,
   };
 }
 
 // stolen from npm:local-access
 const nets = os.networkInterfaces();
 for (const k in nets) {
-  const tmp = nets[k].find((x) => x.family === "IPv4" && !x.internal);
+  const tmp = nets[k]!.find((x) => x.family === "IPv4" && !x.internal);
   if (tmp) {
     console.log(`serving http://${tmp.address}:${server.port}`);
   }

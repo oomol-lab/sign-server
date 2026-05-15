@@ -1,102 +1,151 @@
-# <samp>SIGN SERVER</samp>
+# Sign Server
 
-<samp>English | [简体中文](./README.zh-CN.md)</samp>
+English | [简体中文](./README.zh-CN.md)
 
-<samp>Wraps [SignTool.exe](https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe) as an HTTP service.</samp><br>
-<samp>This tool is intended to run on a local (intranet) machine only. Use with caution.</samp>
+An HTTP wrapper around Microsoft [SignTool.exe](https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe) that lets you sign Windows binaries from any machine on your LAN — including Linux/macOS CI runners that cannot access the hardware UKey directly.
 
-## <samp>1. Prepare the Windows Machine</samp>
+> [!WARNING]
+> This service exposes a hardware-backed code-signing certificate over HTTP. **Do not expose it to the public internet.** Run it only on a trusted intranet, and protect it with the built-in HTTP Basic Auth (see [Configure Authentication](#2-configure-authentication)).
 
-<p>
-  <samp>1. Install the hardware UKey driver. I am using SafeNet.</samp><br>
-  <samp>&nbsp;&nbsp;&nbsp;<strong>Note</strong>: remember to turn on "enable single logon" in the driver client settings.</samp><br>
-  <samp>2. Install the certificate properly. I am using DigiCertHardwareCertificateInstaller.</samp><br>
-  <samp>&nbsp;&nbsp;&nbsp;<strong>Note</strong>: remember to also install the certificate into the local certificate store.</samp><br>
-  <samp>3. Run the following command in PowerShell to verify the steps above:</samp>
-</p>
-<p>
-  <samp>&nbsp;&nbsp;&nbsp;<strong>gci -Recurse Cert: -CodeSigningCert</strong></samp>
-</p>
-<p>
-  <samp>&nbsp;&nbsp;&nbsp;If you can see the certificate names installed in steps 1 and 2, the setup is successful.</samp><br>
-  <samp>&nbsp;&nbsp;&nbsp;Otherwise, make sure the hardware UKey is connected and try again.</samp><br>
-</p>
-<p>
-  <samp>4. Install <a href="https://bun.com" target="_blank">Bun</a>.</samp><br>
-  <samp>5. Install SignTool.exe from the <a href="https://developer.microsoft.com/en-us/windows/downloads/windows-sdk" target="_blank">Windows SDK installer</a>.</samp>
-</p>
+## Features
 
-<samp><strong>Note</strong>: some of the steps above cannot be completed over Windows Remote Desktop.</samp>
+- HTTP API for signing files with a hardware UKey on a remote Windows host
+- Content-addressed cache to skip re-uploading unchanged binaries
+- HTTP Basic Auth with multi-account support
+- Built-in Web UI for manual signing and connectivity testing
+- Drop-in [`sign.js`](./sign.example.js) for Electron Builder
 
-## <samp>2. Configure Authentication</samp>
+## Requirements
 
-<samp>Before starting the service you must create a <code>.token</code> file (already in <code>.gitignore</code>), used for HTTP Basic Auth:</samp>
+- Windows host with the code-signing UKey physically connected
+- [Bun](https://bun.com)
+- [SignTool.exe](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk) (ships with the Windows SDK)
 
-<p>
-  <samp>cp .token.example .token</samp><br>
-  <samp># edit .token, fill in username:password</samp>
-</p>
+## 1. Prepare the Windows Machine
 
-<samp>File format: every non-empty line that is not a <code>#</code> comment is parsed as a <code>username:password</code> pair. Any match in the list grants access; multiple accounts are supported. All endpoints (including the Web UI) require authentication.</samp>
+1. Install the UKey driver (e.g. **SafeNet**).
+   - In the driver client settings, enable **"Enable single logon"**.
+2. Install the certificate (e.g. via **DigiCertHardwareCertificateInstaller**).
+   - Make sure the certificate is also installed into the local certificate store.
+3. Verify the setup in PowerShell:
 
-## <samp>3. Start the Service</samp>
+   ```powershell
+   gci -Recurse Cert: -CodeSigningCert
+   ```
 
-<p>
-  <samp>git clone https://github.com/netless-io/sign-server</samp><br>
-  <samp>cd sign-server</samp><br>
-  <samp>bun start</samp><br>
-  <samp>------</samp><br>
-  <samp>serving http://{local-ip}:3000</samp>
-</p>
+   The certificates installed in steps 1 and 2 should appear. If not, confirm the UKey is connected and try again.
+4. Install [Bun](https://bun.com).
+5. Install **SignTool.exe** from the [Windows SDK installer](https://developer.microsoft.com/en-us/windows/downloads/windows-sdk).
 
-<samp>Note down the {local-ip} printed above. It will be used in <a href="https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder" target="_blank">sign.js</a> (see the next section).</samp>
+> [!NOTE]
+> Some of the steps above cannot be completed over Windows Remote Desktop.
 
-<samp>If 'bun start' reports an error, refer to the error reference table below.</samp>
+## 2. Configure Authentication
 
-### <samp>Errors and Solutions</samp>
+Create a `.token` file (already in `.gitignore`) before starting the service:
 
-<dl>
-  <dt><samp>Not found .token file</samp></dt>
-  <dd><samp>Create a <code>.token</code> file in the project root, following the format of <code>.token.example</code>.</samp></dd>
-  <dt><samp>Invalid .token file</samp></dt>
-  <dd><samp>Check the contents of <code>.token</code>; it must be in <code>username:password</code> format.</samp></dd>
-  <dt><samp>Not found SignTool.exe</samp></dt>
-  <dd><samp>Edit the config.signtool field in package.json and provide the absolute path to SignTool.exe.</samp></dd>
-  <dt><samp>Not found certificate</samp></dt>
-  <dd><samp>Make sure all steps in <a href="#1-prepare-the-windows-machine">section 1</a> have been completed and the hardware UKey is currently connected.</samp></dd>
-  <dt><samp>Found multiple certificates</samp></dt>
-  <dd><samp>Edit the config.subject field in package.json to specify which certificate subject to use.</samp></dd>
-</dl>
+```bash
+cp .token.example .token
+# edit .token, fill in username:password
+```
 
-### <samp>Bonus: Built-in Web UI</samp>
+**File format.** Each non-empty, non-comment line is parsed as a `username:password` pair. Any matching pair grants access; multiple accounts are supported. All endpoints — including the Web UI — require authentication.
 
-<samp>You can visit the address printed above (http://{local-ip}:3000) to access the built-in Web UI, which provides a simple example of uploading and signing a file. On first access, the browser will prompt for credentials; enter the username/password from the <code>.token</code> file. Before moving on to the next section, you can use this page to verify that code signing works correctly.</samp>
+```
+# .token
+admin:s3cret
+ci-bot:another-secret
+```
 
-## <samp>4. Write sign.js for Electron Builder</samp>
+## 3. Start the Service
 
-<samp>For details on custom signing, refer to the <a href="https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder" target="_blank">official documentation</a>.</samp>
+```bash
+git clone https://github.com/netless-io/sign-server
+cd sign-server
+bun start
+# serving http://192.0.2.10:3000
+```
 
-<samp>See <a href="./example-sign.js">example sign.js</a> for a sample script; remember to replace {local-ip} with the real IP address. Authentication credentials are passed via environment variables:</samp>
+Take note of the URL printed above — that's your `SIGN_SERVER_URL`. The host can be either an IP address or a DNS name (e.g. `http://signer.intranet:3000`); you'll need it when integrating with Electron Builder (see [Section 4](#4-integrate-with-electron-builder)).
 
-<p>
-  <samp>SIGN_SERVER_USER=admin SIGN_SERVER_PASS=secret electron-builder ...</samp>
-</p>
+If `bun start` reports an error, see the table below.
 
-<samp><strong>Note</strong>: because the script uses the native fetch() API to upload files, running electron-builder requires at least Node.js 18. For older versions, import {fetch, FormData} from <a href="https://www.npmjs.com/package/undici" target="_blank">"undici"</a>.</samp>
+### Troubleshooting
 
-## <samp>SignTool.exe Cheatsheet</samp>
+| Error | Resolution |
+| --- | --- |
+| `Not found .token file` | Create a `.token` file in the project root following the format of `.token.example`. |
+| `Invalid .token file` | Ensure each entry in `.token` follows the `username:password` format. |
+| `Not found SignTool.exe` | Set `config.signtool` in `package.json` to the absolute path of `SignTool.exe`. |
+| `Not found certificate` | Re-check [Section 1](#1-prepare-the-windows-machine) and confirm the UKey is connected. |
+| `Found multiple certificates` | Set `config.subject` in `package.json` to disambiguate by certificate subject. |
 
-<samp>signtool sign<br>
-&nbsp;&nbsp;/debug /td sha256 /tr http://timestamp.digicert.com /as<br>
-&nbsp;&nbsp;/fd {hash} /sha1 {thumbprint} /s {store} /sm<br>
-&nbsp;&nbsp;{file.exe}</samp>
+### Web UI
 
-## <samp>References</samp>
+Visit the URL printed at startup in a browser to access the built-in Web UI, which provides a minimal upload-and-sign interface. The browser will prompt for the credentials defined in `.token`. Use it to verify the end-to-end signing flow before integrating with your build pipeline.
 
-- [<samp>SignTool.exe (Sign Tool)</samp>](https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe)
-- [<samp>Integrate signing with Electron Builder</samp>](https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder)
-- <samp>[app-builder-lib/src/codeSign/windowsCodeSign.ts](https://github.com/electron-userland/electron-builder/blob/-/packages/app-builder-lib/src/codeSign/windowsCodeSign.ts)</samp>
+## 4. Integrate with Electron Builder
 
-## <samp>License</samp>
+Refer to the [official documentation on custom signing](https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder) for context.
 
-<samp>MIT License.</samp>
+[`sign.example.js`](./sign.example.js) is a drop-in custom sign script. Wire it up in your `electron-builder` config:
+
+```json
+{
+  "win": { "sign": "./sign.example.js" }
+}
+```
+
+The script is fully configured via environment variables — no code changes required:
+
+```bash
+SIGN_SERVER_URL=http://signer.intranet:3000 \
+SIGN_SERVER_USER=admin \
+SIGN_SERVER_PASS=secret \
+  electron-builder ...
+```
+
+`SIGN_SERVER_URL` accepts either an IP address or a DNS name.
+
+> [!NOTE]
+> The sample script uses the native `fetch()` API, so `electron-builder` must run under **Node.js 18 or newer**. On older versions, import `{ fetch, FormData }` from [undici](https://www.npmjs.com/package/undici).
+
+## API Reference
+
+All endpoints require HTTP Basic Auth.
+
+### `POST /exists`
+
+Check whether a file with the given content hash is already cached on the server.
+
+- **Body** — raw text: the file's content hash
+- **Response** — JSON `true` | `false`
+
+### `POST /sign`
+
+Sign a file and return the signed bytes.
+
+- **Body** — `multipart/form-data`:
+  - `file` — either a hash string (cache hit) or the file blob
+  - `hash` — `"sha1"` or `"sha256"`
+  - `isNest` — `"1"` for nested signatures, `""` otherwise
+- **Response** — `application/octet-stream`: the signed file
+
+## SignTool.exe Cheatsheet
+
+```text
+signtool sign
+  /debug /td sha256 /tr http://timestamp.digicert.com /as
+  /fd {hash} /sha1 {thumbprint} /s {store} /sm
+  {file.exe}
+```
+
+## References
+
+- [SignTool.exe (Sign Tool)](https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe)
+- [Integrate signing with Electron Builder](https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder)
+- [`app-builder-lib/src/codeSign/windowsCodeSign.ts`](https://github.com/electron-userland/electron-builder/blob/-/packages/app-builder-lib/src/codeSign/windowsCodeSign.ts)
+
+## License
+
+[MIT](./LICENSE.txt)

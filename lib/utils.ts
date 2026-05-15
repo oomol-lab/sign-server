@@ -1,6 +1,6 @@
-export * from "./cache.js";
+export * from "./cache.ts";
 
-export async function compute_hash(file) {
+export async function compute_hash(file: string | Uint8Array): Promise<string> {
   const hasher = new Bun.CryptoHasher("md5");
   if (typeof file === "string") {
     for await (const chunk of Bun.file(file).stream()) {
@@ -19,7 +19,15 @@ export async function compute_hash(file) {
 
 export const md5 = compute_hash;
 
-export async function exec(file, args, options = {}) {
+export interface ExecOptions {
+  timeout?: number;
+}
+
+export async function exec(
+  file: string,
+  args: string[],
+  options: ExecOptions = {}
+): Promise<string> {
   const proc = Bun.spawn([file, ...args], {
     stdout: "pipe",
     stderr: "pipe",
