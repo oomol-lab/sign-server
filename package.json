@@ -7,9 +7,5 @@
   },
   "devDependencies": {
     "@types/bun": "latest"
-  },
-  "config": {
-    "signtool": "// absolute path to signtool.exe, you can use / instead of \\ here",
-    "thumbprint": "// certificate thumbprint (40 hex chars), shown by `gci -Recurse Cert: -CodeSigningCert`"
   }
 }

@@ -43,11 +43,11 @@ import findCertificate from "./lib/find-certificate.ts";
 import makeSignFn, { type SignBody, type HashMethod } from "./lib/make-sign-fn.ts";
 import { cache } from "./lib/utils.ts";
 import { check_auth, unauthorized } from "./lib/auth.ts";
+import { load_config } from "./lib/config.ts";
 
-const packagePath = path.join(import.meta.dir, "package.json");
 const indexPath = path.join(import.meta.dir, "index.html");
 
-const { config } = await Bun.file(packagePath).json();
+const config = load_config();
 const signtool = await findSignTool(config.signtool);
 const certificates = await findCertificate(config.thumbprint).catch(() => []);
 

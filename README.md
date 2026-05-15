@@ -57,7 +57,24 @@ admin:s3cret
 ci-bot:another-secret
 ```
 
-## 3. Start the Service
+## 3. Configure SignTool & Certificate
+
+Create a `.config` file (already in `.gitignore`):
+
+```bash
+cp .config.example .config
+# edit .config, fill in signtool path and certificate thumbprint
+```
+
+**File format.** `key=value` per line; lines starting with `#` are comments. Both keys are optional — leave a value empty to fall back to auto-detection (`signtool` searches the standard Windows SDK install paths; `thumbprint` is only required when the machine has more than one code-signing certificate).
+
+```
+# .config
+signtool=C:/Program Files (x86)/Windows Kits/10/bin/x64/signtool.exe
+thumbprint=ABCDEF0123456789ABCDEF0123456789ABCDEF01
+```
+
+## 4. Start the Service
 
 ```bash
 git clone https://github.com/netless-io/sign-server
@@ -66,7 +83,7 @@ bun start
 # serving http://192.0.2.10:3000
 ```
 
-Take note of the URL printed above — that's your `SIGN_SERVER_URL`. The host can be either an IP address or a DNS name (e.g. `http://signer.intranet:3000`); you'll need it when integrating with Electron Builder (see [Section 4](#4-integrate-with-electron-builder)).
+Take note of the URL printed above — that's your `SIGN_SERVER_URL`. The host can be either an IP address or a DNS name (e.g. `http://signer.intranet:3000`); you'll need it when integrating with Electron Builder (see [Section 5](#5-integrate-with-electron-builder)).
 
 If `bun start` reports an error, see the table below.
 
@@ -76,15 +93,16 @@ If `bun start` reports an error, see the table below.
 | --- | --- |
 | `Not found .token file` | Create a `.token` file in the project root following the format of `.token.example`. |
 | `Invalid .token file` | Ensure each entry in `.token` follows the `username:password` format. |
-| `Not found SignTool.exe` | Set `config.signtool` in `package.json` to the absolute path of `SignTool.exe`. |
+| `Not found .config file` | Create a `.config` file in the project root following the format of `.config.example`. |
+| `Not found SignTool.exe` | Set `signtool` in `.config` to the absolute path of `SignTool.exe`. |
 | `Not found certificate` | Re-check [Section 1](#1-prepare-the-windows-machine) and confirm the UKey is connected. |
-| `Found multiple certificates` | Set `config.thumbprint` in `package.json` to the 40-char thumbprint of the certificate to use. Run `gci -Recurse Cert: -CodeSigningCert \| Select Subject,Thumbprint` to list candidates. |
+| `Found multiple certificates` | Set `thumbprint` in `.config` to the 40-char thumbprint of the certificate to use. Run `gci -Recurse Cert: -CodeSigningCert \| Select Subject,Thumbprint` to list candidates. |
 
 ### Web UI
 
 Visit the URL printed at startup in a browser to access the built-in Web UI, which provides a minimal upload-and-sign interface. The browser will prompt for the credentials defined in `.token`. Use it to verify the end-to-end signing flow before integrating with your build pipeline.
 
-## 4. Integrate with Electron Builder
+## 5. Integrate with Electron Builder
 
 Refer to the [official documentation on custom signing](https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder) for context.
 

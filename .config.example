@@ -1,0 +1,13 @@
+# .config file: sign-server runtime configuration.
+# Copy this file to ".config" (gitignored) and fill in the values below.
+# Format: key=value per line; lines starting with "#" are comments.
+
+# Absolute path to signtool.exe. You can use "/" instead of "\".
+# Leave empty to let sign-server auto-detect the Windows SDK install.
+signtool=C:/Program Files (x86)/Windows Kits/10/bin/x64/signtool.exe
+
+# Certificate thumbprint (40 hex chars).
+# List candidates with:
+#   gci -Recurse Cert: -CodeSigningCert | Select Subject,Thumbprint
+# Leave empty if there is only one code-signing certificate on the machine.
+thumbprint=ABCDEF0123456789ABCDEF0123456789ABCDEF01

@@ -34,7 +34,7 @@ export default async function findCertificate(thumbprint?: string): Promise<Cert
       isLocalMachine,
     });
   }
-  if (thumbprint && !thumbprint.startsWith("//")) {
+  if (thumbprint) {
     const want = normalize(thumbprint);
     result = result.filter((e) => normalize(e.thumbprint) === want);
   }

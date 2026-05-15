@@ -57,7 +57,24 @@ admin:s3cret
 ci-bot:another-secret
 ```
 
-## 3. 启动服务
+## 3. 配置 SignTool 与证书
+
+创建 `.config` 文件（已加入 `.gitignore`）：
+
+```bash
+cp .config.example .config
+# 编辑 .config，填入 signtool 路径与证书指纹
+```
+
+**文件格式。** 每行一组 `key=value`，以 `#` 开头的行为注释。两个字段均可留空：`signtool` 留空时会自动在 Windows SDK 默认路径下搜索；`thumbprint` 仅在机器上存在多张代码签名证书时才需要指定。
+
+```
+# .config
+signtool=C:/Program Files (x86)/Windows Kits/10/bin/x64/signtool.exe
+thumbprint=ABCDEF0123456789ABCDEF0123456789ABCDEF01
+```
+
+## 4. 启动服务
 
 ```bash
 git clone https://github.com/netless-io/sign-server
@@ -66,7 +83,7 @@ bun start
 # serving http://192.0.2.10:3000
 ```
 
-记下输出的 URL —— 这就是你的 `SIGN_SERVER_URL`。其中的主机部分既可以是 IP 地址，也可以是域名（例如 `http://signer.intranet:3000`），下一节对接 Electron Builder 时会用到（见 [第 4 节](#4-对接-electron-builder)）。
+记下输出的 URL —— 这就是你的 `SIGN_SERVER_URL`。其中的主机部分既可以是 IP 地址，也可以是域名（例如 `http://signer.intranet:3000`），下一节对接 Electron Builder 时会用到（见 [第 5 节](#5-对接-electron-builder)）。
 
 如果运行 `bun start` 时报错，请参考下表。
 
@@ -76,15 +93,16 @@ bun start
 | --- | --- |
 | `Not found .token file` | 在项目根目录创建 `.token` 文件，参考 `.token.example`。 |
 | `Invalid .token file` | 检查 `.token` 内容，每行须为 `username:password` 格式。 |
-| `Not found SignTool.exe` | 在 `package.json` 的 `config.signtool` 字段填入 `SignTool.exe` 的绝对路径。 |
+| `Not found .config file` | 在项目根目录创建 `.config` 文件，参考 `.config.example`。 |
+| `Not found SignTool.exe` | 在 `.config` 的 `signtool` 字段填入 `SignTool.exe` 的绝对路径。 |
 | `Not found certificate` | 重新检查 [第 1 节](#1-准备-windows-机器) 的步骤，并确认 UKey 已连接。 |
-| `Found multiple certificates` | 在 `package.json` 的 `config.thumbprint` 字段中填入要使用的证书指纹（40 位十六进制字符）。可执行 `gci -Recurse Cert: -CodeSigningCert \| Select Subject,Thumbprint` 列出候选。 |
+| `Found multiple certificates` | 在 `.config` 的 `thumbprint` 字段中填入要使用的证书指纹（40 位十六进制字符）。可执行 `gci -Recurse Cert: -CodeSigningCert \| Select Subject,Thumbprint` 列出候选。 |
 
 ### Web UI
 
 在浏览器中访问启动时输出的 URL 可打开内置 Web UI，提供一个简单的上传并签名示例。首次访问时浏览器会弹出登录框，输入 `.token` 中的用户名/密码即可。建议在接入构建流水线之前，先在此处验证签名链路是否正常。
 
-## 4. 对接 Electron Builder
+## 5. 对接 Electron Builder
 
 自定义签名的用法可参考 [官方文档](https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder)。
 
