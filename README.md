@@ -1,43 +1,45 @@
 # <samp>SIGN SERVER</samp>
 
-<samp>把 [SignTool.exe](https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe) 封装成一个 HTTP 服务。</samp><br>
-<samp>本工具仅供在本地（内网）运行，请谨慎使用。</samp>
+<samp>English | [简体中文](./README.zh-CN.md)</samp>
 
-## <samp>1. 准备 Windows 机器</samp>
+<samp>Wraps [SignTool.exe](https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe) as an HTTP service.</samp><br>
+<samp>This tool is intended to run on a local (intranet) machine only. Use with caution.</samp>
+
+## <samp>1. Prepare the Windows Machine</samp>
 
 <p>
-  <samp>1. 安装硬件 UKey 驱动，我使用的是 SafeNet；</samp><br>
-  <samp>&nbsp;&nbsp;&nbsp;<strong>注意</strong>：记得在驱动客户端设置中开启"启用单点登录（enable single logon）"。</samp><br>
-  <samp>2. 正确安装证书，我使用的是 DigiCertHardwareCertificateInstaller；</samp><br>
-  <samp>&nbsp;&nbsp;&nbsp;<strong>注意</strong>：记得把证书也安装到本机的证书存储中。</samp><br>
-  <samp>3. 在 PowerShell 中运行以下命令，确认上述步骤是否完成：</samp>
+  <samp>1. Install the hardware UKey driver. I am using SafeNet.</samp><br>
+  <samp>&nbsp;&nbsp;&nbsp;<strong>Note</strong>: remember to turn on "enable single logon" in the driver client settings.</samp><br>
+  <samp>2. Install the certificate properly. I am using DigiCertHardwareCertificateInstaller.</samp><br>
+  <samp>&nbsp;&nbsp;&nbsp;<strong>Note</strong>: remember to also install the certificate into the local certificate store.</samp><br>
+  <samp>3. Run the following command in PowerShell to verify the steps above:</samp>
 </p>
 <p>
   <samp>&nbsp;&nbsp;&nbsp;<strong>gci -Recurse Cert: -CodeSigningCert</strong></samp>
 </p>
 <p>
-  <samp>&nbsp;&nbsp;&nbsp;如果能看到第 1、2 步安装的证书名称，则说明配置成功。</samp><br>
-  <samp>&nbsp;&nbsp;&nbsp;否则，请确认硬件 UKey 已连接，再重试一次。</samp><br>
+  <samp>&nbsp;&nbsp;&nbsp;If you can see the certificate names installed in steps 1 and 2, the setup is successful.</samp><br>
+  <samp>&nbsp;&nbsp;&nbsp;Otherwise, make sure the hardware UKey is connected and try again.</samp><br>
 </p>
 <p>
-  <samp>4. 安装 <a href="https://bun.com" target="_blank">Bun</a>；</samp><br>
-  <samp>5. 从 <a href="https://developer.microsoft.com/en-us/windows/downloads/windows-sdk" target="_blank">Windows SDK 安装器</a> 安装 SignTool.exe。</samp>
+  <samp>4. Install <a href="https://bun.com" target="_blank">Bun</a>.</samp><br>
+  <samp>5. Install SignTool.exe from the <a href="https://developer.microsoft.com/en-us/windows/downloads/windows-sdk" target="_blank">Windows SDK installer</a>.</samp>
 </p>
 
-<samp><strong>注意</strong>：上述部分步骤无法通过 Windows 远程桌面客户端完成。</samp>
+<samp><strong>Note</strong>: some of the steps above cannot be completed over Windows Remote Desktop.</samp>
 
-## <samp>2. 配置鉴权</samp>
+## <samp>2. Configure Authentication</samp>
 
-<samp>服务启动前必须先创建 <code>.token</code> 文件（已加入 <code>.gitignore</code>），用于 HTTP Basic Auth：</samp>
+<samp>Before starting the service you must create a <code>.token</code> file (already in <code>.gitignore</code>), used for HTTP Basic Auth:</samp>
 
 <p>
   <samp>cp .token.example .token</samp><br>
-  <samp># 编辑 .token，填入 username:password</samp>
+  <samp># edit .token, fill in username:password</samp>
 </p>
 
-<samp>文件格式：每一行非空、非 <code>#</code> 注释的内容都会被解析为一组 <code>username:password</code>，列表中任意一个匹配即可通过；支持多账号。所有接口（包括 Web UI）均需要鉴权。</samp>
+<samp>File format: every non-empty line that is not a <code>#</code> comment is parsed as a <code>username:password</code> pair. Any match in the list grants access; multiple accounts are supported. All endpoints (including the Web UI) require authentication.</samp>
 
-## <samp>3. 启动服务</samp>
+## <samp>3. Start the Service</samp>
 
 <p>
   <samp>git clone https://github.com/netless-io/sign-server</samp><br>
@@ -47,54 +49,54 @@
   <samp>serving http://{local-ip}:3000</samp>
 </p>
 
-<samp>记下上面输出的 {local-ip}，它将用于 <a href="https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder" target="_blank">sign.js</a> 中（见下一节）。</samp>
+<samp>Note down the {local-ip} printed above. It will be used in <a href="https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder" target="_blank">sign.js</a> (see the next section).</samp>
 
-<samp>如果运行 'bun start' 时报错，请参考下面的错误对照表。</samp>
+<samp>If 'bun start' reports an error, refer to the error reference table below.</samp>
 
-### <samp>错误与解决方案</samp>
+### <samp>Errors and Solutions</samp>
 
 <dl>
   <dt><samp>Not found .token file</samp></dt>
-  <dd><samp>在项目根目录创建 <code>.token</code> 文件，参考 <code>.token.example</code> 的格式。</samp></dd>
+  <dd><samp>Create a <code>.token</code> file in the project root, following the format of <code>.token.example</code>.</samp></dd>
   <dt><samp>Invalid .token file</samp></dt>
-  <dd><samp>检查 <code>.token</code> 文件内容，必须为 <code>username:password</code> 格式。</samp></dd>
+  <dd><samp>Check the contents of <code>.token</code>; it must be in <code>username:password</code> format.</samp></dd>
   <dt><samp>Not found SignTool.exe</samp></dt>
-  <dd><samp>编辑 package.json 中的 config.signtool 字段，填入 SignTool.exe 的绝对路径。</samp></dd>
+  <dd><samp>Edit the config.signtool field in package.json and provide the absolute path to SignTool.exe.</samp></dd>
   <dt><samp>Not found certificate</samp></dt>
-  <dd><samp>确认 <a href="#1-准备-windows-机器">第一节</a> 的所有步骤均已完成，且硬件 UKey 当前处于连接状态。</samp></dd>
+  <dd><samp>Make sure all steps in <a href="#1-prepare-the-windows-machine">section 1</a> have been completed and the hardware UKey is currently connected.</samp></dd>
   <dt><samp>Found multiple certificates</samp></dt>
-  <dd><samp>编辑 package.json 中的 config.subject 字段，指定要使用的证书主题。</samp></dd>
+  <dd><samp>Edit the config.subject field in package.json to specify which certificate subject to use.</samp></dd>
 </dl>
 
-### <samp>附赠：内置 Web UI</samp>
+### <samp>Bonus: Built-in Web UI</samp>
 
-<samp>可以通过上面输出的地址（http://{local-ip}:3000）访问内置的 Web UI，里面有一个简单的上传并签名文件的示例。首次访问时浏览器会弹出登录框，输入 <code>.token</code> 文件中的用户名/密码即可。在进入下一节之前，可以先在这里测试代码签名是否正常工作。</samp>
+<samp>You can visit the address printed above (http://{local-ip}:3000) to access the built-in Web UI, which provides a simple example of uploading and signing a file. On first access, the browser will prompt for credentials; enter the username/password from the <code>.token</code> file. Before moving on to the next section, you can use this page to verify that code signing works correctly.</samp>
 
-## <samp>4. 为 Electron Builder 编写 sign.js</samp>
+## <samp>4. Write sign.js for Electron Builder</samp>
 
-<samp>关于自定义签名的用法，请参考 <a href="https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder" target="_blank">官方文档</a>。</samp>
+<samp>For details on custom signing, refer to the <a href="https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder" target="_blank">official documentation</a>.</samp>
 
-<samp>示例脚本见 <a href="./example-sign.js">example sign.js</a>，记得将其中的 {local-ip} 替换为真实的 IP 地址。鉴权凭据通过环境变量传入：</samp>
+<samp>See <a href="./example-sign.js">example sign.js</a> for a sample script; remember to replace {local-ip} with the real IP address. Authentication credentials are passed via environment variables:</samp>
 
 <p>
   <samp>SIGN_SERVER_USER=admin SIGN_SERVER_PASS=secret electron-builder ...</samp>
 </p>
 
-<samp><strong>注意</strong>：由于该脚本使用了原生 fetch() API 上传文件，运行 electron-builder 至少需要 Node.js 18。如果版本较低，可以从 <a href="https://www.npmjs.com/package/undici" target="_blank">"undici"</a> 导入 {fetch, FormData}。</samp>
+<samp><strong>Note</strong>: because the script uses the native fetch() API to upload files, running electron-builder requires at least Node.js 18. For older versions, import {fetch, FormData} from <a href="https://www.npmjs.com/package/undici" target="_blank">"undici"</a>.</samp>
 
-## <samp>SignTool.exe 速查表</samp>
+## <samp>SignTool.exe Cheatsheet</samp>
 
 <samp>signtool sign<br>
 &nbsp;&nbsp;/debug /td sha256 /tr http://timestamp.digicert.com /as<br>
 &nbsp;&nbsp;/fd {hash} /sha1 {thumbprint} /s {store} /sm<br>
 &nbsp;&nbsp;{file.exe}</samp>
 
-## <samp>参考资料</samp>
+## <samp>References</samp>
 
 - [<samp>SignTool.exe (Sign Tool)</samp>](https://learn.microsoft.com/en-us/dotnet/framework/tools/signtool-exe)
 - [<samp>Integrate signing with Electron Builder</samp>](https://www.electron.build/tutorials/code-signing-windows-apps-on-unix#integrate-signing-with-electron-builder)
 - <samp>[app-builder-lib/src/codeSign/windowsCodeSign.ts](https://github.com/electron-userland/electron-builder/blob/-/packages/app-builder-lib/src/codeSign/windowsCodeSign.ts)</samp>
 
-## <samp>许可证</samp>
+## <samp>License</samp>
 
-<samp>MIT License。</samp>
+<samp>MIT License.</samp>
